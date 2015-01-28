@@ -6,7 +6,7 @@ var util = require('util');
 var EventEmitter = require('events').EventEmitter;
 
 var updateIntervalMins = 15;
-var heartbeatIntervalSecs = 20;
+var heartbeatIntervalSecs = 15;
 
 // Device types
 var EQ3MAX_DEV_TYPE_CUBE = 0;
@@ -59,46 +59,57 @@ function MaxCube(ip, port) {
     log('Connection closed');
   });
 
-  var ruleUpdateTrigger = new schedule.RecurrenceRule();
   // run every 15 mins, first time 8 min after hour
-  ruleUpdateTrigger.minute = [new schedule.Range(8, 60, 15)];
-  var updateTriggerJob = schedule.scheduleJob(ruleUpdateTrigger, function(){
-    var offset = 0;
-    Object.keys(self.devices).forEach(function(rf_address) {
-      if (self.devices[rf_address] !== undefined && self.devices[rf_address].devicetype === 1) {
-        // TODO: better not use anonymous function? (http://stackoverflow.com/a/5226333)
-        (function(rf_address) {
-          setTimeout(function() {
-            var temp = self.devicesStatus[rf_address] ? self.devicesStatus[rf_address].setpoint_user + 0.5 : 1.5;
-            log('Update trigger ' + rf_address);
-            setTemperature.call(self, rf_address, 'MANUAL', temp);
-          }, offset++ * 15000);
-        })(rf_address);
-      }
-    });
-  });
 
-  var ruleUpdateTriggerReset = new schedule.RecurrenceRule();
-  ruleUpdateTriggerReset.minute = [new schedule.Range(10, 60, 15)];
-  var updateTriggerResetJob = schedule.scheduleJob(ruleUpdateTriggerReset, function(){
-    var offset = 0;
-    Object.keys(self.devices).forEach(function(rf_address) {
-      if (self.devices[rf_address] !== undefined && self.devices[rf_address].devicetype === 1) {
-        (function(rf_address) {
-          setTimeout(function() {
-            var temp = self.devicesStatus[rf_address] ? self.devicesStatus[rf_address].setpoint_user : 1;
-            log('Update trigger reset ' + rf_address);
-            setTemperature.call(self, rf_address, 'MANUAL', temp);
-          }, offset * 15000);
-        })(rf_address);
-      }
-    });
-  });
+  //ruleUpdateTrigger.minute = [new schedule.Range(8, 60, 15)];
+
+  //var updateTriggerJob = schedule.scheduleJob(ruleUpdateTrigger, function () {
+  //  var offset = 0;
+  //  Object.keys(self.devices).forEach(function(rf_address) {
+  //    if (self.devices[rf_address] !== undefined && self.devices[rf_address].devicetype === 1) {
+  //      // TODO: better not use anonymous function? (http://stackoverflow.com/a/5226333)
+  //      (function(rf_address) {
+  //        setTimeout(function() {
+  //          var temp = self.devicesStatus[rf_address] ? self.devicesStatus[rf_address].setpoint_user + 0.5 : 1.5;
+  //          log('Update trigger ' + rf_address);
+  //          setTemperature.call(self, rf_address, 'MANUAL', temp);
+  //        }, offset++ * 15000);
+  //      })(rf_address);
+  //    }
+  //  });
+  //});
+
+  //var ruleUpdateTriggerReset = new schedule.RecurrenceRule();
+  //ruleUpdateTriggerReset.minute = [new schedule.Range(10, 60, 15)];
+  //var updateTriggerResetJob = schedule.scheduleJob(ruleUpdateTriggerReset, function(){
+  //  var offset = 0;
+  //  Object.keys(self.devices).forEach(function(rf_address) {
+  //    if (self.devices[rf_address] !== undefined && self.devices[rf_address].devicetype === 1) {
+  //      (function(rf_address) {
+  //        setTimeout(function() {
+  //          var temp = self.devicesStatus[rf_address] ? self.devicesStatus[rf_address].setpoint_user : 1;
+  //          log('Update trigger reset ' + rf_address);
+  //          setTemperature.call(self, rf_address, 'MANUAL', temp);
+  //        }, offset * 15000);
+  //      })(rf_address);
+  //    }
+  //  });
+  //});
 
   var ruleHeartbeat = new schedule.RecurrenceRule();
-  ruleHeartbeat.second = [new schedule.Range(heartbeatIntervalSecs/2, 59, heartbeatIntervalSecs)];
+  ruleHeartbeat.second = heartbeatIntervalSecs; //[new schedule.Range(heartbeatIntervalSecs/2, 59, heartbeatIntervalSecs)];
   var heartbeatJob = schedule.scheduleJob(ruleHeartbeat, function(){
-    log('Heartbeat');
+      log('Heartbeat');
+
+      //previous status logging 
+      Object.keys(this.deviceStatus).forEach(function (rf_address) {
+          var ds = self.getDeviceStatus[rf_address];
+
+          if (ds !== undefined && ds.devicetype === 1) {
+              var message = moment.format() + ';' + ds.valve + ';' + ds.temp + ';' + ds.setpoint + ';' + ds.mode + ';'
+              fs.appendFile('log_' + rf_address + '.txt', message + "\r\n");
+          }
+      });
     doHeartbeat.call(self, function (dataObj) {});
   });
 
@@ -510,6 +521,5 @@ function decodeDeviceThermostat (payload) {
 function log (message) {
   fs.appendFile('log_maxcube.txt', '[' + moment().format() + '] ' + message + "\n");
 }
-
 
 module.exports = MaxCube;
